@@ -95,6 +95,48 @@ await test('importCsvText: end-to-end fixture import, dedupe, and merge', async 
   await rm(storePath, { force: true });
 });
 
+await test('CartStore keeps other customers untouched when one customer is written', async () => {
+  const storePath = path.join(os.tmpdir(), `cart-automation-test-${Date.now()}-multi.json`);
+  const store = new CartStore(storePath);
+
+  await store.addItems('customer-a', [{ url: 'https://a.com/1', quantity: 1 }], 'sheet-a');
+  await store.addItems('customer-b', [{ url: 'https://b.com/1', quantity: 1 }], 'sheet-b');
+
+  assert.equal((await store.getCart('customer-a')).length, 1);
+  assert.equal((await store.getCart('customer-b')).length, 1);
+
+  await rm(storePath, { force: true });
+});
+
+await test('CartStore.addItems serializes concurrent calls on the same instance (no lost updates)', async () => {
+  const storePath = path.join(os.tmpdir(), `cart-automation-test-${Date.now()}-concurrent.json`);
+  const store = new CartStore(storePath);
+
+  // Fire off many concurrent adds for the same customer+url without awaiting
+  // between them — a naive read-modify-write would lose all but one.
+  await Promise.all(
+    Array.from({ length: 20 }, () =>
+      store.addItems('customer-1', [{ url: 'https://a.com/1', quantity: 1 }], 'sheet'),
+    ),
+  );
+
+  const cart = await store.getCart('customer-1');
+  assert.equal(cart.length, 1);
+  assert.equal(cart[0].quantity, 20);
+
+  await rm(storePath, { force: true });
+});
+
+await test('CartStore.addItems is a no-op (no file write) when every row was invalid', async () => {
+  const storePath = path.join(os.tmpdir(), `cart-automation-test-${Date.now()}-empty.json`);
+  const store = new CartStore(storePath);
+
+  const result = await store.addItems('customer-1', [], 'sheet');
+  assert.deepEqual(result, { added: 0, merged: 0 });
+
+  await assert.rejects(() => readFile(storePath, 'utf8'), { code: 'ENOENT' });
+});
+
 console.log(`\n${passed} test(s) passed`);
 if (process.exitCode) {
   console.error('Some tests failed.');
