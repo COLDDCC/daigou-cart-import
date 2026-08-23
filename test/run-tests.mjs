@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFile, rm } from 'node:fs/promises';
+import { readFile, rm, writeFile, unlink, utimes } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
@@ -8,6 +9,24 @@ import { toCsvExportUrl } from '../src/sheetUrl.mjs';
 import { normalizeRow } from '../src/normalize.mjs';
 import { importCsvText } from '../src/importSheet.mjs';
 import { CartStore } from '../src/cartStore.mjs';
+import { withFileLock } from '../src/fileLock.mjs';
+
+function runWorker(storePath, customerId, url) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [
+      path.join(__dirname, 'fixtures/concurrent-add-worker.mjs'),
+      storePath,
+      customerId,
+      url,
+    ]);
+    let stderr = '';
+    child.stderr.on('data', (d) => (stderr += d));
+    child.on('exit', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`worker exited with code ${code}: ${stderr}`));
+    });
+  });
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let passed = 0;
@@ -135,6 +154,48 @@ await test('CartStore.addItems is a no-op (no file write) when every row was inv
   assert.deepEqual(result, { added: 0, merged: 0 });
 
   await assert.rejects(() => readFile(storePath, 'utf8'), { code: 'ENOENT' });
+});
+
+await test('CartStore.addItems survives real concurrent writers from separate processes', async () => {
+  const storePath = path.join(os.tmpdir(), `cart-automation-test-${Date.now()}-cross-process.json`);
+  const workerCount = 8;
+
+  await Promise.all(
+    Array.from({ length: workerCount }, () => runWorker(storePath, 'customer-1', 'https://a.com/1')),
+  );
+
+  const cart = await new CartStore(storePath).getCart('customer-1');
+  assert.equal(cart.length, 1);
+  assert.equal(cart[0].quantity, workerCount);
+
+  await rm(storePath, { force: true });
+});
+
+await test('withFileLock steals a stale lockfile instead of hanging forever', async () => {
+  const targetPath = path.join(os.tmpdir(), `cart-automation-test-${Date.now()}-stale.json`);
+  const lockPath = `${targetPath}.lock`;
+  await writeFile(lockPath, '');
+  const longAgo = new Date(Date.now() - 1000);
+  await utimes(lockPath, longAgo, longAgo);
+
+  const result = await withFileLock(targetPath, async () => 'ran', {
+    staleMs: 100,
+    retryMs: 10,
+    timeoutMs: 2000,
+  });
+  assert.equal(result, 'ran');
+
+  await unlink(lockPath).catch(() => {});
+});
+
+await test('withFileLock times out with a clear error when the lock never frees', async () => {
+  const targetPath = path.join(os.tmpdir(), `cart-automation-test-${Date.now()}-timeout.json`);
+  await withFileLock(targetPath, async () => {
+    await assert.rejects(
+      () => withFileLock(targetPath, async () => {}, { staleMs: 60_000, retryMs: 10, timeoutMs: 100 }),
+      /获取文件锁超时/,
+    );
+  });
 });
 
 console.log(`\n${passed} test(s) passed`);

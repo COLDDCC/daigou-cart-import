@@ -1,25 +1,24 @@
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { withFileLock } from './fileLock.mjs';
 
 // Stand-in for the real cart backend: one JSON file, keyed by customerId.
 // Swap this class for a real DB/API client later — addItems()/getCart() is
 // the whole surface the importer depends on.
 //
-// Known limitation: writes are only serialized *within one process* (see
-// #writeQueue below). Two separate CLI runs (or server processes) writing to
-// the same file at the same instant can still race and lose an update, since
-// each reads the file before either writes it back. Fine for one person
-// running imports one at a time; if this ever gets a webhook/server front
-// end that can trigger concurrent imports, either queue calls through one
-// process or move to a real datastore with transactions before that ships.
+// addItems() takes a lockfile before its read-modify-write, so concurrent
+// imports racing on the same cart file — same process or two separate CLI
+// runs from different people — merge correctly instead of one silently
+// clobbering the other. That lock only works within one filesystem: if the
+// team runs this from their own laptops against their own copies of the
+// file, each person just has a different cart. Point everyone at one shared
+// file (one server, or a shared network path) until this moves to a real
+// backend with its own concurrency handling.
 export class CartStore {
   constructor(filePath) {
     this.filePath = filePath;
-    this.#writeQueue = Promise.resolve();
   }
-
-  #writeQueue;
 
   async #load() {
     try {
@@ -43,21 +42,11 @@ export class CartStore {
   // the same customer merges quantity instead of creating a duplicate line,
   // so submitting the same sheet twice (or an updated version of it) is safe.
   async addItems(customerId, items, sourceSheetUrl) {
-    // Chain onto the queue so concurrent addItems() calls on the same
-    // in-process instance don't read-modify-write over one another.
-    const result = this.#writeQueue.then(() =>
-      this.#addItemsUnlocked(customerId, items, sourceSheetUrl),
-    );
-    this.#writeQueue = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
+    if (items.length === 0) return { added: 0, merged: 0 };
+    return withFileLock(this.filePath, () => this.#addItemsLocked(customerId, items, sourceSheetUrl));
   }
 
-  async #addItemsUnlocked(customerId, items, sourceSheetUrl) {
-    if (items.length === 0) return { added: 0, merged: 0 };
-
+  async #addItemsLocked(customerId, items, sourceSheetUrl) {
     const data = await this.#load();
     const cart = data[customerId] ?? [];
     const keyOf = (i) => `${i.url}::${i.variant ?? ''}`;
