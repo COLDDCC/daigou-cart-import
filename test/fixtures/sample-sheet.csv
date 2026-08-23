@@ -1,0 +1,7 @@
+商品链接,数量,规格,备注
+https://item.example.com/a1001,2,红色 M,要礼盒装
+https://item.example.com/a1002,,,数量列留空
+not-a-valid-url,1,,链接格式错误应跳过
+,3,,缺少链接应跳过
+https://item.example.com/a1001,1,红色 M,和第一行重复应合并数量
+"https://item.example.com/a1003?ref=a,b",1,"蓝色, 加大",链接和备注里带逗号

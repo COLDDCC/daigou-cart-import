@@ -1,0 +1,14 @@
+{
+  "name": "daigou-cart-import",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Import a customer-submitted spreadsheet of product links into the daigou platform's cart, instead of adding each link by hand.",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "import": "node src/importSheet.mjs",
+    "test": "node test/run-tests.mjs"
+  }
+}
