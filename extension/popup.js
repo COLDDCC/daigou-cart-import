@@ -8,6 +8,7 @@ const importLinkBtn = document.getElementById('import-link');
 const importFileBtn = document.getElementById('import-file');
 const fileInput = document.getElementById('csv-file');
 const statusEl = document.getElementById('status');
+const warningsEl = document.getElementById('warnings');
 const listEl = document.getElementById('item-list');
 const openNextBtn = document.getElementById('open-next');
 const openAllBtn = document.getElementById('open-all');
@@ -17,6 +18,16 @@ const batchSizeInput = document.getElementById('batch-size');
 function setStatus(text, isError = false) {
   statusEl.textContent = text;
   statusEl.classList.toggle('error', isError);
+}
+
+function renderWarnings(warnings) {
+  warningsEl.innerHTML = '';
+  warningsEl.hidden = warnings.length === 0;
+  for (const w of warnings) {
+    const li = document.createElement('li');
+    li.textContent = w;
+    warningsEl.appendChild(li);
+  }
 }
 
 function rowsToItems(rows) {
@@ -36,11 +47,17 @@ async function importCsvText(csvText) {
   const { items, warnings } = rowsToItems(rows);
   const { added, updated } = await mergeItems(items);
   const skipped = rows.length - items.length;
-  setStatus(
-    `导入完成：新增 ${added} 条，更新 ${updated} 条，跳过 ${skipped} 行` +
-      (warnings.length ? `（${warnings.length} 条警告，见控制台）` : ''),
-  );
-  if (warnings.length) console.warn(warnings.join('\n'));
+
+  if (rows.length > 0 && items.length === 0) {
+    setStatus(
+      `这份表格的 ${rows.length} 行全部被跳过了，很可能是表头列名对不上（下面列了每一行具体原因）。` +
+        '需要"商品链接"这一列，中英文列名都行，见下方仓库 README 里的对照表。',
+      true,
+    );
+  } else {
+    setStatus(`导入完成：新增 ${added} 条，更新 ${updated} 条，跳过 ${skipped} 行`, false);
+  }
+  renderWarnings(warnings);
   await renderList();
 }
 
@@ -97,6 +114,17 @@ async function renderList() {
   const pendingCount = items.filter((i) => i.status === 'pending').length;
   openNextBtn.disabled = pendingCount === 0;
   openAllBtn.disabled = pendingCount === 0;
+  const disabledReason = items.length === 0 ? '还没有导入任何商品' : '没有待处理的商品了（都已打开或删除）';
+  openNextBtn.title = pendingCount === 0 ? disabledReason : '';
+  openAllBtn.title = pendingCount === 0 ? disabledReason : '';
+
+  if (items.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'empty-hint';
+    empty.textContent = '还没有导入任何商品：先在上面粘贴表格链接点"拉取"，或者上传一个 CSV 文件。';
+    listEl.appendChild(empty);
+    return;
+  }
 
   for (const item of items) {
     const li = document.createElement('li');
