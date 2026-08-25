@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>白手套助手</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <header class="title-bar">
+      <span>白手套助手</span>
+      <button id="close-panel" class="close-btn" title="关闭这个窗口" aria-label="关闭">×</button>
+    </header>
+
+    <section class="import-panel">
+      <label>
+        表格链接
+        <div class="row">
+          <input id="sheet-url" type="text" placeholder="粘贴 Google Sheets 分享链接" />
+          <button id="import-link">拉取</button>
+        </div>
+      </label>
+
+      <label>
+        或者直接上传表格文件（CSV）
+        <div class="row">
+          <button id="import-file">选择文件</button>
+          <input id="csv-file" type="file" accept=".csv,text/csv" hidden />
+        </div>
+      </label>
+
+      <label>
+        链接所在列的表头名（选填）
+        <input id="url-column" type="text" placeholder="留空则自动识别“商品链接/link/url”等常见列名" />
+      </label>
+
+      <p id="status" class="status"></p>
+      <ul id="warnings" class="warnings" hidden></ul>
+    </section>
+
+    <section class="batch-panel">
+      <p class="hint">
+        清单导入后不会自动打开，下面选一种方式手动触发：逐条点"打开"最保险；
+        批量按钮是把清单里<strong>还没打开过</strong>的链接一次性开出好几个后台标签页，
+        数量多、目标网站又有防机器人机制时，建议调小数量或者只用逐条打开，避免被当成异常流量拦截。
+      </p>
+      <div class="row">
+        <label class="inline">
+          每批打开
+          <input id="batch-size" type="number" min="1" value="3" title="点“打开下一批”时一次开几个" />
+          个
+        </label>
+        <button id="open-next" title="从清单里还没打开过的商品中，按左边设置的数量打开这么多个">打开下一批</button>
+        <button id="open-all" title="把清单里所有还没打开过的商品一次性全部打开">打开全部剩余</button>
+      </div>
+      <div class="row end">
+        <button id="clear-all" class="danger">清空清单</button>
+      </div>
+    </section>
+
+    <ul id="item-list" class="item-list"></ul>
+
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>

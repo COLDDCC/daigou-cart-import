@@ -17,10 +17,16 @@ function findValue(rowObj, aliases) {
 
 // rowNumber is the spreadsheet row number (accounting for the header row),
 // used only to make warnings point back at a row the customer can find.
-export function normalizeRow(rowObj, rowNumber) {
-  const rawUrl = findValue(rowObj, HEADER_ALIASES.url);
+// urlColumn (optional) is an exact column header the caller wants to treat
+// as the link column, checked before the built-in aliases — this is what
+// lets the tool work on any spreadsheet, not just ones using one of the
+// pre-set column names.
+export function normalizeRow(rowObj, rowNumber, { urlColumn } = {}) {
+  const urlAliases = urlColumn ? [urlColumn, ...HEADER_ALIASES.url] : HEADER_ALIASES.url;
+  const rawUrl = findValue(rowObj, urlAliases);
   if (!rawUrl) {
-    return { item: null, warnings: [`第 ${rowNumber} 行：缺少商品链接，已跳过`] };
+    const columnHint = urlColumn ? `（找的是"${urlColumn}"这一列）` : '';
+    return { item: null, warnings: [`第 ${rowNumber} 行：缺少商品链接${columnHint}，已跳过`] };
   }
 
   let url;

@@ -3,10 +3,12 @@ import { parseCsv } from './lib/csv.js';
 import { normalizeRow } from './lib/normalize.js';
 import { getItems, mergeItems, setItemStatus, removeItem, clearAll } from './lib/store.js';
 
+const closeBtn = document.getElementById('close-panel');
 const sheetUrlInput = document.getElementById('sheet-url');
 const importLinkBtn = document.getElementById('import-link');
 const importFileBtn = document.getElementById('import-file');
 const fileInput = document.getElementById('csv-file');
+const urlColumnInput = document.getElementById('url-column');
 const statusEl = document.getElementById('status');
 const warningsEl = document.getElementById('warnings');
 const listEl = document.getElementById('item-list');
@@ -31,11 +33,12 @@ function renderWarnings(warnings) {
 }
 
 function rowsToItems(rows) {
+  const urlColumn = urlColumnInput.value.trim() || undefined;
   const items = [];
   const warnings = [];
   rows.forEach((row, idx) => {
     // row 1 is the header, so the first data row is spreadsheet row 2.
-    const { item, warnings: rowWarnings } = normalizeRow(row, idx + 2);
+    const { item, warnings: rowWarnings } = normalizeRow(row, idx + 2, { urlColumn });
     warnings.push(...rowWarnings);
     if (item) items.push(item);
   });
@@ -100,9 +103,9 @@ function itemLabel(item) {
 }
 
 async function openItem(item) {
-  // active:false keeps focus on the popup so it doesn't auto-close and lose
-  // the rest of the batch, and doesn't touch the target page in any way
-  // beyond loading it — same as a human opening a link in a background tab.
+  // active:false doesn't steal focus from whatever you're doing, and
+  // doesn't touch the target page in any way beyond loading it — same as a
+  // human opening a link in a background tab.
   await chrome.tabs.create({ url: item.url, active: false });
   await setItemStatus(item.id, 'opened');
 }
@@ -174,7 +177,7 @@ async function renderList() {
 async function openBatch(all) {
   const items = await getItems();
   const pending = items.filter((i) => i.status === 'pending');
-  const batchSize = all ? pending.length : Math.max(1, parseInt(batchSizeInput.value, 10) || 5);
+  const batchSize = all ? pending.length : Math.max(1, parseInt(batchSizeInput.value, 10) || 3);
   const toOpen = pending.slice(0, batchSize);
 
   for (const item of toOpen) {
@@ -193,5 +196,7 @@ clearBtn.addEventListener('click', async () => {
   setStatus('已清空');
   await renderList();
 });
+
+closeBtn.addEventListener('click', () => window.close());
 
 renderList();

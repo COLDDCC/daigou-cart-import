@@ -33,6 +33,24 @@ await test('parseCsv / toCsvExportUrl / normalizeRow behave the same as the CLI 
   assert.equal(item.quantity, 2);
 });
 
+await test('normalizeRow: custom urlColumn is used instead of the built-in aliases', () => {
+  // A generic spreadsheet with a column name that isn't in the built-in list.
+  const row = { '文章链接': 'https://example.com/a', '商品链接': 'https://should-be-ignored.com' };
+  const { item } = normalizeRow(row, 2, { urlColumn: '文章链接' });
+  assert.equal(item.url, 'https://example.com/a');
+});
+
+await test('normalizeRow: falls back to built-in aliases when no urlColumn is given', () => {
+  const { item } = normalizeRow({ 商品链接: 'https://a.com/x' }, 2);
+  assert.equal(item.url, 'https://a.com/x');
+});
+
+await test('normalizeRow: warning mentions the custom column name when it is missing', () => {
+  const { item, warnings } = normalizeRow({ 别的列: 'foo' }, 3, { urlColumn: '文章链接' });
+  assert.equal(item, null);
+  assert.match(warnings[0], /文章链接/);
+});
+
 await test('mergeItems adds new pending items and reports counts', async () => {
   reset();
   const { added, updated } = await mergeItems([
