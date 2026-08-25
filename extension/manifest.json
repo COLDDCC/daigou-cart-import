@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "代购选品助手",
+  "version": "0.1.0",
+  "description": "把客户表格里的商品链接批量转成待办清单，一键在后台标签页打开，替代一个个手动找链接；加入购物车这一步还是你自己在网站上手动点。",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://docs.google.com/*"]
+}

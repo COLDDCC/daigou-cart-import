@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>代购选品助手</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <section class="import-panel">
+      <label>
+        表格链接
+        <div class="row">
+          <input id="sheet-url" type="text" placeholder="粘贴 Google Sheets 分享链接" />
+          <button id="import-link">拉取</button>
+        </div>
+      </label>
+
+      <label>
+        或者直接上传表格文件（CSV）
+        <div class="row">
+          <button id="import-file">选择文件</button>
+          <input id="csv-file" type="file" accept=".csv,text/csv" hidden />
+        </div>
+      </label>
+
+      <p id="status" class="status"></p>
+    </section>
+
+    <section class="batch-panel">
+      <label>
+        每批打开
+        <input id="batch-size" type="number" min="1" value="5" />
+        个
+      </label>
+      <button id="open-next">打开下一批</button>
+      <button id="open-all">打开全部剩余</button>
+      <button id="clear-all" class="danger">清空清单</button>
+    </section>
+
+    <ul id="item-list" class="item-list"></ul>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
