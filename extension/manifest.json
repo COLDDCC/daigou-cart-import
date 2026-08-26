@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "白手套助手",
-  "version": "0.2.0",
+  "name": "购物车助手",
+  "version": "0.3.0",
   "description": "上传一份表格，批量把里面某一列的链接在后台标签页打开——替代一个个手动找链接。窗口打开后会一直留着，方便你分批处理。",
   "background": {
     "service_worker": "background.js",
@@ -20,7 +20,7 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     },
-    "default_title": "白手套助手"
+    "default_title": "购物车助手"
   },
   "permissions": ["storage", "tabs"],
   "host_permissions": ["https://docs.google.com/*"]
