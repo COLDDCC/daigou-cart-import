@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { installMockChromeStorage } from './mockChromeStorage.mjs';
-import { parseCsv } from '../lib/csv.js';
+import { parseCsv, parseCsvRows, rowsToObjects } from '../lib/csv.js';
+import { findHeaderRowIndex } from '../lib/headerRow.js';
 import { toCsvExportUrl } from '../lib/sheetUrl.js';
 import { normalizeRow } from '../lib/normalize.js';
 
@@ -31,6 +32,42 @@ await test('parseCsv / toCsvExportUrl / normalizeRow behave the same as the CLI 
   );
   const { item } = normalizeRow({ 商品链接: 'https://a.com/x', 数量: '2' }, 2);
   assert.equal(item.quantity, 2);
+});
+
+await test('findHeaderRowIndex skips a leading note row with only one non-empty cell', () => {
+  const rows = parseCsvRows(
+    '汇率：0.044  点数14 均价点数是 18一本,,,,\n' +
+      '名称,图片,商品链接,平时价格,实际价格\n' +
+      'a,,https://example.com/1,100,90\n',
+  );
+  assert.equal(findHeaderRowIndex(rows), 1);
+});
+
+await test('findHeaderRowIndex defaults to row 0 when every row already looks like a header', () => {
+  const rows = parseCsvRows('商品链接,数量\nhttps://a.com/1,1\n');
+  assert.equal(findHeaderRowIndex(rows), 0);
+});
+
+await test('a real-world export with a note row above the header now parses correctly end to end', () => {
+  // Reproduces the exact shape of the file that tripped this up: row 1 is a
+  // freeform note ("汇率：0.044 ..."), the real header is row 2, and 商品链接
+  // is the third column, not the first.
+  const csvText =
+    '汇率：0.044  点数14 均价点数是 18一本,,,,,,,,\n' +
+    '名称,图片,商品链接,平时价格,实际价格,cn,个数,QQ号\n' +
+    '駿河屋 -<中古>某商品,,https://www.suruga-ya.jp/product/detail/ZHOTI326464,500,475,堕引,,\n' +
+    '駿河屋 -<中古>某商品2,,https://www.suruga-ya.jp/product/detail/ZHOTI300832,400,380,堕引,,\n';
+
+  const rawRows = parseCsvRows(csvText);
+  const headerRowIndex = findHeaderRowIndex(rawRows);
+  assert.equal(headerRowIndex, 1);
+
+  const rows = rowsToObjects(rawRows, headerRowIndex);
+  assert.equal(rows.length, 2);
+
+  const { item, warnings } = normalizeRow(rows[0], headerRowIndex + 2);
+  assert.deepEqual(warnings, []);
+  assert.equal(item.url, 'https://www.suruga-ya.jp/product/detail/ZHOTI326464');
 });
 
 await test('normalizeRow: custom urlColumn is used instead of the built-in aliases', () => {

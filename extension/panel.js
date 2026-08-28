@@ -1,5 +1,6 @@
 import { toCsvExportUrl } from './lib/sheetUrl.js';
-import { parseCsv } from './lib/csv.js';
+import { parseCsvRows, rowsToObjects } from './lib/csv.js';
+import { findHeaderRowIndex } from './lib/headerRow.js';
 import { normalizeRow } from './lib/normalize.js';
 import { getItems, mergeItems, setItemStatus, removeItem, clearAll } from './lib/store.js';
 
@@ -32,13 +33,15 @@ function renderWarnings(warnings) {
   }
 }
 
-function rowsToItems(rows) {
+function rowsToItems(rows, headerRowIndex) {
   const urlColumn = urlColumnInput.value.trim() || undefined;
   const items = [];
   const warnings = [];
   rows.forEach((row, idx) => {
-    // row 1 is the header, so the first data row is spreadsheet row 2.
-    const { item, warnings: rowWarnings } = normalizeRow(row, idx + 2, { urlColumn });
+    // headerRowIndex is 0-based; its own row is spreadsheet row
+    // headerRowIndex + 1, so the first data row is headerRowIndex + 2.
+    const rowNumber = headerRowIndex + 2 + idx;
+    const { item, warnings: rowWarnings } = normalizeRow(row, rowNumber, { urlColumn });
     warnings.push(...rowWarnings);
     if (item) items.push(item);
   });
@@ -46,19 +49,22 @@ function rowsToItems(rows) {
 }
 
 async function importCsvText(csvText) {
-  const rows = parseCsv(csvText);
-  const { items, warnings } = rowsToItems(rows);
+  const rawRows = parseCsvRows(csvText);
+  const headerRowIndex = findHeaderRowIndex(rawRows);
+  const rows = rowsToObjects(rawRows, headerRowIndex);
+  const { items, warnings } = rowsToItems(rows, headerRowIndex);
   const { added, updated } = await mergeItems(items);
   const skipped = rows.length - items.length;
+  const skippedLeadingRows = headerRowIndex > 0 ? `（自动跳过开头 ${headerRowIndex} 行非表头内容，从第 ${headerRowIndex + 1} 行识别为表头）` : '';
 
   if (rows.length > 0 && items.length === 0) {
     setStatus(
-      `这份表格的 ${rows.length} 行全部被跳过了，很可能是表头列名对不上（下面列了每一行具体原因）。` +
-        '需要"商品链接"这一列，中英文列名都行，见下方仓库 README 里的对照表。',
+      `这份表格的 ${rows.length} 行全部被跳过了${skippedLeadingRows}，很可能是表头列名对不上` +
+        '（下面列了每一行具体原因）。需要"商品链接"这一列，中英文列名都行，见下方仓库 README 里的对照表。',
       true,
     );
   } else {
-    setStatus(`导入完成：新增 ${added} 条，更新 ${updated} 条，跳过 ${skipped} 行`, false);
+    setStatus(`导入完成：新增 ${added} 条，更新 ${updated} 条，跳过 ${skipped} 行${skippedLeadingRows}`, false);
   }
   renderWarnings(warnings);
   await renderList();

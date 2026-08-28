@@ -1,7 +1,10 @@
 // Minimal RFC4180-style CSV parser (handles quoted fields containing commas,
 // newlines, and escaped quotes) so notes/links with commas in them survive.
-// Returns an array of row objects keyed by the header row.
-export function parseCsv(text) {
+// Returns the raw grid (array of arrays) -- no assumption about which row is
+// the header, since real-world exports often have a title/note row (or a
+// few) above the actual header row. Use findHeaderRowIndex() + rowsToObjects()
+// to turn this into header-keyed objects.
+export function parseCsvRows(text) {
   const rows = [];
   let row = [];
   let field = '';
@@ -66,10 +69,17 @@ export function parseCsv(text) {
     rows.pop();
   }
 
-  const [header, ...dataRows] = rows;
+  return rows;
+}
+
+// Turns a raw grid into header-keyed objects, treating rows[headerRowIndex]
+// as the header and everything after it as data.
+export function rowsToObjects(rows, headerRowIndex = 0) {
+  const header = rows[headerRowIndex];
   if (!header) return [];
 
-  return dataRows
+  return rows
+    .slice(headerRowIndex + 1)
     .filter((r) => !(r.length === 1 && r[0] === ''))
     .map((r) => {
       const obj = {};
@@ -78,4 +88,11 @@ export function parseCsv(text) {
       });
       return obj;
     });
+}
+
+// Convenience wrapper for callers that know the header is row 0 (e.g. the
+// CLI, and existing tests) -- unchanged behavior from before this file
+// learned to look past a leading note row.
+export function parseCsv(text) {
+  return rowsToObjects(parseCsvRows(text), 0);
 }
